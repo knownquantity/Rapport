@@ -11,44 +11,33 @@
   <style>
     html, body { margin: 0; height: 100%; background: #FCFFD6; overflow: hidden; }
     canvas { position: fixed; inset: 0; z-index: 0; }
-    h1.title {
-      position: fixed; left: 50%; bottom: 2rem; transform: translateX(-50%);
-      margin: 0; font-size: 6rem; font-weight: 400; color: #1a1a1a;
-      z-index: 2; pointer-events: none;
-    }
   </style>
 </head>
 <body>
   <canvas id="fx"></canvas>
-  <h1 class="title" id="title">rapport.computer</h1>
   <script>
-    // RESPONSIVE FONT SIZES: desktop/tablet font-size scales to handle narrow viewports
-    const titleEl = document.getElementById('title');
-    function adjustFont() {
-      const fs = Math.min(6, Math.max(2.5, window.innerWidth / 150)) + 'rem';
-      titleEl.style.fontSize = fs;
-    }
-    window.addEventListener('resize', adjustFont);
-    adjustFont();
-
-    const canvas = document.getElementById('fx');
-    const ctx = canvas.getContext('2d');
-    let dpr = Math.min(window.devicePixelRatio || 1, 2);
-    let W = 0, H = 0, now = 0, last = 0;
-
     // ----- letters in flight -----
     const letters = { pts: [] };
+    const canvas = document.getElementById('fx');
+    const ctx = canvas.getContext('2d');
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let W = 0, H = 0, now = 0, last = 0;
+    const FONT = "Audiowide";
+    const TEXT = "rapport.computer";
+
+    // base font-size shrinks with viewport width, matched to original 6rem at wide
+    function fontSize() { return Math.min(96, Math.max(40, Math.floor(window.innerWidth / 13.5))); }
+
     function rnd(a, b) { return a + Math.random() * (b - a); }
     function letterHomes() {
-      const fontSize = parseFloat(getComputedStyle(titleEl).fontSize);
-      ctx.font = '400 ' + fontSize + 'px Audiowide';
-      const text = 'rapport.computer';
-      const w = ctx.measureText(text).width;
+      const fs = fontSize();
+      ctx.font = '400 ' + fs + 'px ' + FONT;
+      const w = ctx.measureText(TEXT).width;
       const x0 = (W - w) / 2;
-      const y = H - Math.max(32, H * 0.04);
+      const y = H - Math.max(32, H * 0.045);
       let acc = 0;
       const res = [];
-      for (const ch of text) {
+      for (const ch of TEXT) {
         const cw = ctx.measureText(ch).width;
         res.push({ ch: ch, homeX: x0 + acc + cw / 2, homeY: y, w: cw });
         acc += cw;
@@ -79,9 +68,10 @@
       });
     }
     function drawLetters() {
+      const fs = fontSize();
       ctx.fillStyle = '#FCFFD6';
       ctx.fillRect(0, 0, W, H);
-      ctx.font = '400 ' + parseFloat(getComputedStyle(titleEl).fontSize) + 'px Audiowide';
+      ctx.font = '400 ' + fs + 'px ' + FONT;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'alphabetic';
       letters.pts.forEach(p => {
@@ -96,8 +86,6 @@
       canvas.width = W * dpr; canvas.height = H * dpr;
       canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      adjustFont();
-      // brief timeout to let font sizing settle before recompute homes
       setTimeout(resetLetters, 60);
     }
 
