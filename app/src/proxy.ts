@@ -1,23 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-const RESERVED = new Set([
-  'www',
-  'api',
-  'admin',
-  'app',
-  'mail',
-  'email',
-  'support',
-  'help',
-  'blog',
-  'docs',
-  'status',
-  'test',
-  'staging',
-  'dev',
-  'dashboard',
-]);
+import { normalizeSubdomain, RESERVED_SUBDOMAINS } from '@/lib/validation';
 
 function getRootDomain(): string {
   const raw = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://rapport.computer';
@@ -40,13 +23,16 @@ export function proxy(request: NextRequest) {
   }
 
   const label = host.slice(0, host.length - root.length - 1);
-  if (!label || label.includes('.') || RESERVED.has(label)) {
+  if (!label || label.includes('.') || RESERVED_SUBDOMAINS.has(label)) {
     return NextResponse.next();
   }
 
   const { pathname } = request.nextUrl;
   const url = request.nextUrl.clone();
-  url.pathname = pathname === '/' ? `/u/${label}` : `/u/${label}${pathname}`;
+  url.pathname =
+    pathname === '/'
+      ? `/u/${normalizeSubdomain(label)}`
+      : `/u/${normalizeSubdomain(label)}${pathname}`;
   return NextResponse.rewrite(url);
 }
 
