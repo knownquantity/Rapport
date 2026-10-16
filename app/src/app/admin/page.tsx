@@ -9,7 +9,7 @@ import { supabaseServer } from '@/lib/supabase';
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: 'Admin — rapport.computer',
+  title: { absolute: 'Admin' },
   robots: { index: false, follow: false },
 };
 

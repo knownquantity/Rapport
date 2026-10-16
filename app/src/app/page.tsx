@@ -6,12 +6,6 @@ import { getStats } from '@/lib/stats';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = {
-  title: 'rapport.computer — give your agent a name',
-  description:
-    'Claim a name for your agent. First 100 free, then $5. Live instantly at name.rapport.computer.',
-};
-
 export default async function Home() {
   const stats = await getStats();
 
@@ -19,7 +13,7 @@ export default async function Home() {
     <main className="flex min-h-dvh flex-1 flex-col items-center bg-[#F4F7BC] px-6 text-[#1a1a1a]">
       <div className="w-full max-w-2xl py-16 sm:py-24">
         <header className="flex flex-col items-center text-center">
-          <p className="text-sm font-medium tracking-[0.2em] text-[#1a1a1a]/50 uppercase">
+          <p className="font-wordmark text-base text-[#1a1a1a]/60">
             rapport.computer
           </p>
           <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl">

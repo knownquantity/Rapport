@@ -3,7 +3,7 @@ import ShareButton from '@/components/ShareButton';
 import { claimUrl, siteUrl } from '@/lib/claims';
 
 export const metadata = {
-  title: 'Your name is live — rapport.computer',
+  title: { absolute: 'Your name is live' },
 };
 
 export default async function Page(props: PageProps<'/claim/success'>) {

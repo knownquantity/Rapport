@@ -8,7 +8,7 @@ export async function generateMetadata(props: PageProps<'/u/[subdomain]'>) {
   const name = `${subdomain}.rapport.computer`;
 
   if (!claim || claim.status !== 'active') {
-    return { title: `${name} — not available` };
+    return { title: { absolute: `${name} — not available` } };
   }
 
   const description = claim.bio ?? `${name} is claimed on rapport.computer.`;
@@ -17,7 +17,7 @@ export async function generateMetadata(props: PageProps<'/u/[subdomain]'>) {
   }`;
 
   return {
-    title: name,
+    title: { absolute: name },
     description,
     openGraph: {
       title: name,

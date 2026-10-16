@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { siteUrl } from '@/lib/claims';
 
 export const metadata = {
-  title: 'Checkout cancelled — rapport.computer',
+  title: { absolute: 'Checkout cancelled' },
 };
 
 export default async function Page(props: PageProps<'/claim/cancel'>) {
