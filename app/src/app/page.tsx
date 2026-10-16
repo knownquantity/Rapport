@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import ClaimForm from '@/components/ClaimForm';
 import Counter from '@/components/Counter';
 import RecentFeed from '@/components/RecentFeed';
 import { getStats } from '@/lib/stats';
@@ -46,9 +47,7 @@ export default async function Home() {
           <h2 className="text-sm font-medium tracking-[0.2em] text-[#1a1a1a]/50 uppercase">
             Claim
           </h2>
-          <p className="mt-4 text-[#1a1a1a]/70">
-            Enter a name to check availability.
-          </p>
+          <ClaimForm initialFreeRemaining={stats.freeRemaining} />
         </section>
 
         <section className="mt-20">
