@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { claimUrl } from '@/lib/claims';
+import { claimUrl, isBlockingClaim } from '@/lib/claims';
 import { supabaseServer } from '@/lib/supabase';
 import {
   normalizeEmail,
@@ -46,14 +46,14 @@ export async function POST(request: Request) {
 
   const { data: existing, error: existingError } = await supabase
     .from('claims')
-    .select('subdomain')
+    .select('id, status, claimed_at')
     .eq('subdomain', nameCheck.name)
     .maybeSingle();
 
   if (existingError) {
     return NextResponse.json({ error: 'lookup_failed' }, { status: 500 });
   }
-  if (existing) {
+  if (existing && isBlockingClaim(existing.status, existing.claimed_at)) {
     return NextResponse.json({ error: 'taken' }, { status: 409 });
   }
 
@@ -74,22 +74,30 @@ export async function POST(request: Request) {
   }
 
   const token = crypto.randomUUID();
+  const values = {
+    owner_email: email,
+    bio,
+    is_free: true,
+    status: 'active',
+    stripe_payment_id: null,
+    metadata: { claim_token: token },
+  };
 
-  const { data: claim, error: insertError } = await supabase
-    .from('claims')
-    .insert({
-      subdomain: nameCheck.name,
-      owner_email: email,
-      bio,
-      is_free: true,
-      status: 'active',
-      metadata: { claim_token: token },
-    })
-    .select('subdomain, claimed_at')
-    .maybeSingle();
+  const { data: claim, error: writeError } = existing
+    ? await supabase
+        .from('claims')
+        .update(values)
+        .eq('id', existing.id)
+        .select('subdomain, claimed_at')
+        .maybeSingle()
+    : await supabase
+        .from('claims')
+        .insert({ subdomain: nameCheck.name, ...values })
+        .select('subdomain, claimed_at')
+        .maybeSingle();
 
-  if (insertError) {
-    if (insertError.code === '23505') {
+  if (writeError || !claim) {
+    if (writeError?.code === '23505') {
       return NextResponse.json({ error: 'taken' }, { status: 409 });
     }
     return NextResponse.json({ error: 'insert_failed' }, { status: 500 });

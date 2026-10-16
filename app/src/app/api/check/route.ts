@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isBlockingClaim } from '@/lib/claims';
 import { supabaseServer } from '@/lib/supabase';
 import { validateSubdomain } from '@/lib/validation';
 
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabaseServer()
     .from('claims')
-    .select('subdomain')
+    .select('status, claimed_at')
     .eq('subdomain', result.name)
     .maybeSingle();
 
@@ -23,7 +24,9 @@ export async function GET(request: Request) {
     );
   }
 
-  return data
+  const taken = data ? isBlockingClaim(data.status, data.claimed_at) : false;
+
+  return taken
     ? NextResponse.json({ available: false, reason: 'taken' })
     : NextResponse.json({ available: true });
 }

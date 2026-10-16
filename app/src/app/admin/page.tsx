@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import RemoveClaimButton from '@/app/admin/RemoveClaimButton';
-import { formatClaimedAt } from '@/lib/claims';
+import PurgeStaleButton from '@/app/admin/PurgeStaleButton';
+import { formatClaimedAt, PENDING_TTL_MS } from '@/lib/claims';
 import { supabaseServer } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -35,6 +36,22 @@ async function removeClaim(formData: FormData) {
   if (!id) return;
 
   await supabaseServer().from('claims').update({ status: 'removed' }).eq('id', id);
+  revalidatePath('/admin');
+}
+
+async function purgeStalePending(formData: FormData) {
+  'use server';
+
+  const expected = process.env.ADMIN_TOKEN;
+  const token = String(formData.get('token') ?? '');
+  if (!expected || token !== expected) return;
+
+  const cutoff = new Date(Date.now() - PENDING_TTL_MS).toISOString();
+  await supabaseServer()
+    .from('claims')
+    .update({ status: 'removed' })
+    .eq('status', 'pending')
+    .lt('claimed_at', cutoff);
   revalidatePath('/admin');
 }
 
@@ -109,7 +126,10 @@ export default async function AdminPage(props: PageProps<'/admin'>) {
   return (
     <main className="min-h-dvh flex-1 bg-[#F4F7BC] px-6 py-12 text-[#1a1a1a]">
       <div className="mx-auto w-full max-w-5xl">
-        <h1 className="text-2xl font-semibold tracking-tight">Claims</h1>
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-semibold tracking-tight">Claims</h1>
+          <PurgeStaleButton action={purgeStalePending} token={token} />
+        </div>
 
         <dl className="mt-6 flex flex-wrap gap-x-8 gap-y-2 text-sm">
           {counts.map(([label, value]) => (

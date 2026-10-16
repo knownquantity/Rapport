@@ -21,6 +21,18 @@ export const getClaim = cache(
   },
 );
 
+export const PENDING_TTL_MS = 24 * 60 * 60 * 1000;
+
+export function isBlockingClaim(
+  status: string,
+  claimedAt: string,
+  now: number = Date.now(),
+): boolean {
+  if (status === 'active') return true;
+  if (status === 'pending') return now - Date.parse(claimedAt) < PENDING_TTL_MS;
+  return false;
+}
+
 export { claimUrl, siteUrl } from '@/lib/site';
 
 export function formatClaimedAt(iso: string): string {
