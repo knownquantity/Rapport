@@ -10,99 +10,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Audiowide&display=swap" rel="stylesheet">
   <style>
     html, body { margin: 0; height: 100%; background: #FCFFD6; overflow: hidden; }
-    canvas { position: fixed; inset: 0; z-index: 0; }
+    body { display: flex; align-items: flex-end; justify-content: center; font-family: 'Audiowide', sans-serif; }
+    h1 { margin: 2rem; font-size: 6rem; font-weight: 400; color: #1a1a1a; }
   </style>
 </head>
 <body>
-  <canvas id="fx"></canvas>
-  <script>
-    // ----- letters in flight -----
-    const letters = { pts: [] };
-    const canvas = document.getElementById('fx');
-    const ctx = canvas.getContext('2d');
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    let W = 0, H = 0, now = 0, last = 0;
-    const FONT = "Audiowide";
-    const TEXT = "rapport.computer";
-
-    // base font-size shrinks with viewport width, matched to original 6rem at wide
-    function fontSize() { return Math.min(96, Math.max(40, Math.floor(window.innerWidth / 13.5))); }
-
-    function rnd(a, b) { return a + Math.random() * (b - a); }
-    function letterHomes() {
-      const fs = fontSize();
-      ctx.font = '400 ' + fs + 'px ' + FONT;
-      const w = ctx.measureText(TEXT).width;
-      const x0 = (W - w) / 2;
-      const y = H - Math.max(32, H * 0.045);
-      let acc = 0;
-      const res = [];
-      for (const ch of TEXT) {
-        const cw = ctx.measureText(ch).width;
-        res.push({ ch: ch, homeX: x0 + acc + cw / 2, homeY: y, w: cw });
-        acc += cw;
-      }
-      return res;
-    }
-    function resetLetters() {
-      letters.pts = letterHomes().map(h => ({
-        ch: h.ch, homeX: h.homeX, homeY: h.homeY, w: h.w,
-        x: h.homeX + rnd(-W * 0.45, W * 0.45),
-        y: h.homeY + rnd(-H * 0.45, H * 0.45),
-        vx: rnd(-4, 4), vy: rnd(-6, -1),
-        kick: rnd(4000, 11000),
-      }));
-    }
-    function updateLetters(dt) {
-      letters.pts.forEach(p => {
-        p.kick -= dt;
-        if (p.kick <= 0) {
-          p.kick = rnd(9000, 18000);
-          p.vx += rnd(-9, 9);
-          p.vy += rnd(-14, -6);
-        }
-        const dx = p.homeX - p.x, dy = p.homeY - p.y;
-        p.vx += dx * 0.0022; p.vy += dy * 0.0022;
-        p.vx *= 0.9; p.vy *= 0.9;
-        p.x += p.vx; p.y += p.vy;
-      });
-    }
-    function drawLetters() {
-      const fs = fontSize();
-      ctx.fillStyle = '#FCFFD6';
-      ctx.fillRect(0, 0, W, H);
-      ctx.font = '400 ' + fs + 'px ' + FONT;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'alphabetic';
-      letters.pts.forEach(p => {
-        const travel = Math.hypot(p.vx, p.vy);
-        ctx.fillStyle = 'rgba(26,26,26,' + (0.7 + Math.min(1, travel / 8) * 0.25) + ')';
-        ctx.fillText(p.ch, p.x, p.y);
-      });
-    }
-
-    function resize() {
-      W = window.innerWidth; H = window.innerHeight;
-      canvas.width = W * dpr; canvas.height = H * dpr;
-      canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      setTimeout(resetLetters, 60);
-    }
-
-    window.addEventListener('resize', resize);
-
-    if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(() => { resize(); requestAnimationFrame(loop); });
-    } else {
-      resize(); requestAnimationFrame(loop);
-    }
-    function loop(ts) {
-      now = ts;
-      const dt = last ? Math.min(ts - last, 50) : 16; last = ts;
-      updateLetters(dt);
-      drawLetters();
-      requestAnimationFrame(loop);
-    }
-  </script>
+  <h1>rapport.computer</h1>
 </body>
 </html>
