@@ -9,12 +9,462 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Audiowide&display=swap" rel="stylesheet">
   <style>
-    html, body { margin: 0; height: 100%; background: #FCFFD6; overflow: hidden; }
-    body { display: flex; align-items: flex-end; justify-content: center; font-family: 'Audiowide', sans-serif; }
-    h1 { margin: 2rem; font-size: 6rem; font-weight: 400; color: #1a1a1a; }
+    html, body { margin: 0; height: 100%; background: #FCFFD6; overflow: hidden; font-family: 'Audiowide', sans-serif; }
+    canvas { position: fixed; inset: 0; z-index: 0; }
+    h1.title {
+      position: fixed; left: 50%; bottom: 2rem; transform: translateX(-50%);
+      margin: 0; font-size: 6rem; font-weight: 400; color: #1a1a1a;
+      z-index: 2; pointer-events: none;
+      transition: opacity .25s ease;
+    }
+    h1.title.hidden { opacity: 0; }
+    .desc {
+      position: fixed; top: 1.2rem; left: 1.2rem; z-index: 3;
+      font-size: .75rem; letter-spacing: .08em; text-transform: lowercase;
+      color: rgba(26,26,26,.55); max-width: 42vw; line-height: 1.4;
+      pointer-events: none;
+    }
+    .controls {
+      position: fixed; top: 1.2rem; right: 1.2rem; z-index: 3;
+      display: flex; gap: .4rem; flex-wrap: wrap; justify-content: flex-end; max-width: 60vw;
+    }
+    .pill {
+      background: rgba(252,255,214,.7); border: 1px solid rgba(26,26,26,.2);
+      backdrop-filter: blur(8px); color: #1a1a1a; font-family: inherit;
+      font-size: .65rem; letter-spacing: .06em; text-transform: lowercase;
+      padding: .45rem .75rem; border-radius: 999px; cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .pill:hover { background: rgba(26,26,26,.08); }
+    .pill.active { background: #1a1a1a; color: #FCFFD6; border-color: #1a1a1a; }
+    .hint {
+      position: fixed; bottom: 1.2rem; left: 1.2rem; z-index: 3;
+      font-size: .6rem; letter-spacing: .08em; text-transform: lowercase;
+      color: rgba(26,26,26,.4); pointer-events: none;
+    }
   </style>
 </head>
 <body>
-  <h1>rapport.computer</h1>
+  <canvas id="fx"></canvas>
+  <h1 class="title" id="title">rapport.computer</h1>
+  <div class="desc" id="desc"></div>
+  <nav class="controls" id="controls"></nav>
+  <div class="hint">← → to cycle · hover for stigmergy</div>
+  <script>
+    const CREAM = '#FCFFD6';
+    const INK = 'rgba(26,26,26,';
+    const MODES = [
+      { id: 'orbit',    name: '01 orbiting flock',     desc: 'agents loop the word in ellipses; faint tethers form between nearest neighbours' },
+      { id: 'stigmergy',name: '02 stigmergy trail',   desc: 'ambient particles drift; the cursor lays a pheromone trail they flow toward' },
+      { id: 'mesh',     name: '03 pulsing mesh',      desc: 'random pulses ripple through a field of nodes; clusters light and fade' },
+      { id: 'sonar',    name: '04 sonar ping',       desc: 'concentric frayed rings broadcast outward from the word, slow and quiet' },
+      { id: 'letters',  name: '05 letters in flight', desc: 'the wordmark assembles from scattered glyphs; one occasionally flies out and returns' },
+      { id: 'flow',     name: '06 flow field',        desc: 'a noise-driven stream of dots drifts diagonally, like agents moving as weather' },
+    ];
+    const canvas = document.getElementById('fx');
+    const ctx = canvas.getContext('2d');
+    const titleEl = document.getElementById('title');
+    const descEl = document.getElementById('desc');
+    const controlsEl = document.getElementById('controls');
+
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let W = 0, H = 0, now = 0, last = 0;
+    let mode = MODES[0].id;
+    let mouse = { x: -9999, y: -9999, active: false, lastMove: 0 };
+
+    // ----- shared utils -----
+    function rnd(a, b) { return a + Math.random() * (b - a); }
+    function dist(x1, y1, x2, y2) { const dx = x1 - x2, dy = y1 - y2; return Math.sqrt(dx*dx + dy*dy); }
+    function resize() {
+      W = window.innerWidth; H = window.innerHeight;
+      canvas.width = W * dpr; canvas.height = H * dpr;
+      canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      Object.values(STATES).forEach(s => { if (s.reset) s.reset(); });
+    }
+    function solidBg() { ctx.fillStyle = CREAM; ctx.fillRect(0, 0, W, H); }
+    function trailBg(a) { ctx.fillStyle = 'rgba(252,255,214,' + a + ')'; ctx.fillRect(0, 0, W, H); }
+    function fontReady() { return document.fonts.ready; }
+
+    // ----- orbit -----
+    const orbit = { pts: [] };
+    function resetOrbit() {
+      orbit.pts = [];
+      const n = 7;
+      const cx = W / 2, cy = H * 0.62;
+      for (let i = 0; i < n; i++) {
+        const r = rnd(150, 290);
+        orbit.pts.push({
+          angle: rnd(0, Math.PI * 2),
+          r: r,
+          speed: rnd(0.04, 0.11) * (Math.random() < .5 ? 1 : -1),
+          size: rnd(2.4, 4.6),
+          phase: rnd(0, Math.PI * 2),
+        });
+      }
+    }
+    function updateOrbit(dt) {
+      orbit.pts.forEach(p => { p.angle += p.speed * (dt / 1000); p.phase += 0.02; });
+    }
+    function drawOrbit() {
+      solidBg();
+      const cx = W / 2, cy = H * 0.62;
+      // faint connect tethers
+      ctx.lineWidth = 1;
+      for (let i = 0; i < orbit.pts.length; i++) {
+        for (let j = i + 1; j < orbit.pts.length; j++) {
+          const a = orbit.pts[i], b = orbit.pts[j];
+          const ax = cx + Math.cos(a.angle) * a.r;
+          const ay = cy + Math.sin(a.angle) * (a.r * 0.55);
+          const bx = cx + Math.cos(b.angle) * b.r;
+          const by = cy + Math.sin(b.angle) * (b.r * 0.55);
+          const d = dist(ax, ay, bx, by);
+          if (d < 130) {
+            ctx.strokeStyle = 'rgba(26,26,26,' + (1 - d / 130) * 0.18 + ')';
+            ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+          }
+        }
+      }
+      orbit.pts.forEach(p => {
+        const x = cx + Math.cos(p.angle) * p.r;
+        const y = cy + Math.sin(p.angle) * (p.r * 0.55);
+        const pulse = 0.5 + 0.5 * Math.sin(p.phase);
+        ctx.fillStyle = 'rgba(26,26,26,' + (0.45 + pulse * 0.35) + ')';
+        ctx.beginPath(); ctx.arc(x, y, p.size + pulse * 1.2, 0, Math.PI * 2); ctx.fill();
+      });
+    }
+
+    // ----- stigmergy -----
+    const stig = { pts: [], trail: [], lastMouseSample: 0 };
+    function resetStig() {
+      stig.pts = [];
+      for (let i = 0; i < 95; i++) {
+        stig.pts.push({ x: rnd(0, W), y: rnd(0, H), vx: rnd(-0.3, 0.3), vy: rnd(-0.3, 0.3), a: rnd(0, Math.PI * 2) });
+      }
+    }
+    function updateStig(dt) {
+      const mactive = mouse.active && (now - mouse.lastMove < 2000);
+      const mx = mouse.x, my = mouse.y;
+      stig.pts.forEach(p => {
+        // brownian drift of heading
+        p.a += rnd(-0.08, 0.08);
+        p.vx += Math.cos(p.a) * 0.04;
+        p.vy += Math.sin(p.a) * 0.04;
+        if (mactive) {
+          const d = dist(p.x, p.y, mx, my);
+          if (d < 220 && d > 0) {
+            const pull = (1 - d / 220) * 0.35;
+            p.vx += (mx - p.x) / d * pull;
+            p.vy += (my - p.y) / d * pull;
+          }
+        }
+        // damping
+        p.vx *= 0.92; p.vy *= 0.92;
+        // clamp speed
+        const sp = Math.hypot(p.vx, p.vy);
+        if (sp > 2.4) { p.vx *= 2.4 / sp; p.vy *= 2.4 / sp; }
+        p.x += p.vx; p.y += p.vy;
+        // wrap
+        if (p.x < -20) p.x = W + 20;
+        if (p.x > W + 20) p.x = -20;
+        if (p.y < -20) p.y = H + 20;
+        if (p.y > H + 20) p.y = -20;
+      });
+    }
+    function drawStig() {
+      trailBg(0.07);
+      // connection tethers (nearest 2)
+      ctx.lineWidth = 1;
+      stig.pts.forEach((p, i) => {
+        let closest = null, cdist = 70;
+        for (let j = 0; j < stig.pts.length; j++) {
+          if (j === i) continue;
+          const q = stig.pts[j];
+          const d = dist(p.x, p.y, q.x, q.y);
+          if (d < cdist) { cdist = d; closest = q; }
+        }
+        if (closest) {
+          ctx.strokeStyle = 'rgba(26,26,26,0.12)';
+          ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(closest.x, closest.y); ctx.stroke();
+        }
+      });
+      stig.pts.forEach(p => {
+        const sp = Math.hypot(p.vx, p.vy);
+        const a = 0.45 + Math.min(1, sp / 2) * 0.35;
+        ctx.fillStyle = 'rgba(26,26,26,' + a + ')';
+        ctx.beginPath(); ctx.arc(p.x, p.y, 1.6 + sp * 0.6, 0, Math.PI * 2); ctx.fill();
+      });
+      // faint pheromone at cursor
+      if (mouse.active && now - mouse.lastMove < 2000) {
+        const g = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 160);
+        g.addColorStop(0, 'rgba(26,26,26,0.06)');
+        g.addColorStop(1, 'rgba(26,26,26,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(mouse.x - 160, mouse.y - 160, 320, 320);
+      }
+    }
+
+    // ----- mesh -----
+    const mesh = { pts: [], pulses: [], lastPulse: 0 };
+    function resetMesh() {
+      mesh.pts = [];
+      for (let i = 0; i < 100; i++) {
+        mesh.pts.push({ x: rnd(40, W - 40), y: rnd(40, H - 40) });
+      }
+      mesh.pulses = []; mesh.lastPulse = now;
+    }
+    function updateMesh(dt) {
+      if (now - mesh.lastPulse > 2600) {
+        mesh.pulses.push({ x: rnd(60, W - 60), y: rnd(60, H - 60), t: now });
+        mesh.lastPulse = now;
+      }
+      // prune
+      mesh.pulses = mesh.pulses.filter(p => now - p.t < 3000);
+    }
+    function drawMesh() {
+      solidBg();
+      // tethers (within 80)
+      ctx.lineWidth = 1;
+      for (let i = 0; i < mesh.pts.length; i++) {
+        for (let j = i + 1; j < mesh.pts.length; j++) {
+          const a = mesh.pts[i], b = mesh.pts[j];
+          const d = dist(a.x, a.y, b.x, b.y);
+          if (d < 82) {
+            ctx.strokeStyle = 'rgba(26,26,26,' + (1 - d / 82) * 0.1 + ')';
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+          }
+        }
+      }
+      // points with pulse intensity
+      mesh.pts.forEach(p => {
+        let I = 0;
+        mesh.pulses.forEach(pl => {
+          const life = (now - pl.t) / 3000;
+          const d = dist(p.x, p.y, pl.x, pl.y);
+          const sigma = 140;
+          I += Math.exp(-(d * d) / (2 * sigma * sigma)) * (1 - life);
+        });
+        I = Math.min(1, I);
+        const r = 1.4 + I * 3.2;
+        ctx.fillStyle = 'rgba(26,26,26,' + (0.28 + I * 0.55) + ')';
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+      });
+      // pulse ripples
+      mesh.pulses.forEach(pl => {
+        const life = (now - pl.t) / 3000;
+        const r = 40 + life * 420;
+        ctx.strokeStyle = 'rgba(26,26,26,' + (1 - life) * 0.16 + ')';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(pl.x, pl.y, r, 0, Math.PI * 2); ctx.stroke();
+      });
+    }
+
+    // ----- sonar -----
+    const sonar = { rings: [], last: 0 };
+    function resetSonar() { sonar.rings = []; sonar.last = now; }
+    function updateSonar(dt) {
+      if (now - sonar.last > 6200) { sonar.rings.push({ t: now }); sonar.last = now; }
+      sonar.rings = sonar.rings.filter(r => now - r.t < 4000);
+    }
+    function sonarNoise(theta, seed) {
+      return Math.sin(theta * 4 + seed) * 6 + Math.sin(theta * 9 + seed * 1.3) * 3 + Math.sin(theta * 17 + seed * 0.7) * 1.5;
+    }
+    function drawSonar() {
+      solidBg();
+      // soft glow behind title area
+      const cx = W / 2, cy = H * 0.72;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(W, H) * 0.5);
+      g.addColorStop(0, 'rgba(26,26,26,0.05)');
+      g.addColorStop(1, 'rgba(26,26,26,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      sonar.rings.forEach(r => {
+        const life = (now - r.t) / 4000;
+        const radius = 60 + life * Math.min(W, H) * 0.85;
+        const alpha = (1 - life) * 0.22;
+        ctx.strokeStyle = 'rgba(26,26,26,' + alpha + ')';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let a = 0; a <= Math.PI * 2; a += 0.04) {
+          const rr = radius + sonarNoise(a, r.t * 0.001) * (1 - life * 0.4);
+          const x = cx + Math.cos(a) * rr;
+          const y = cy + Math.sin(a) * (rr * 0.45);
+          if (a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath(); ctx.stroke();
+      });
+    }
+
+    // ----- letters -----
+    const letters = { pts: [] };
+    function letterHomes() {
+      const fontSize = 96;
+      ctx.font = '400 ' + fontSize + 'px Audiowide';
+      const text = 'rapport.computer';
+      const w = ctx.measureText(text).width;
+      const x0 = (W - w) / 2;
+      const y = H - 32;
+      let acc = 0;
+      const res = [];
+      for (const ch of text) {
+        const cw = ctx.measureText(ch).width;
+        res.push({ ch: ch, homeX: x0 + acc + cw / 2, homeY: y, w: cw });
+        acc += cw;
+      }
+      return res;
+    }
+    function resetLetters() {
+      letters.pts = letterHomes().map(h => ({
+        ch: h.ch, homeX: h.homeX, homeY: h.homeY, w: h.w,
+        x: h.homeX + rnd(-W * 0.45, W * 0.45),
+        y: h.homeY + rnd(-H * 0.45, H * 0.45),
+        vx: rnd(-4, 4), vy: rnd(-6, -1),
+        kick: rnd(4000, 11000),
+      }));
+    }
+    function updateLetters(dt) {
+      letters.pts.forEach(p => {
+        p.kick -= dt;
+        if (p.kick <= 0) {
+          p.kick = rnd(9000, 18000);
+          p.vx += rnd(-9, 9);
+          p.vy += rnd(-14, -6);
+        }
+        // spring toward home
+        const dx = p.homeX - p.x, dy = p.homeY - p.y;
+        p.vx += dx * 0.0022; p.vy += dy * 0.0022;
+        p.vx *= 0.9; p.vy *= 0.9;
+        p.x += p.vx; p.y += p.vy;
+      });
+    }
+    function drawLetters() {
+      solidBg();
+      ctx.font = '400 96px Audiowide';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      letters.pts.forEach(p => {
+        const travel = Math.hypot(p.vx, p.vy);
+        ctx.fillStyle = 'rgba(26,26,26,' + (0.7 + Math.min(1, travel / 8) * 0.25) + ')';
+        ctx.fillText(p.ch, p.x, p.y);
+      });
+    }
+
+    // ----- flow -----
+    const flow = { pts: [] };
+    function resetFlow() {
+      flow.pts = [];
+      const n = 70;
+      for (let i = 0; i < n; i++) {
+        flow.pts.push({
+          x: rnd(-20, W + 20), y: rnd(0, H),
+          vx: rnd(0.5, 1.6), vy: rnd(-0.4, 0.4),
+        });
+      }
+    }
+    function flowField(x, y) {
+      const a = x * 0.0027 + y * 0.0019;
+      const b = x * 0.0009 - y * 0.0033;
+      const v = Math.sin(a) + Math.sin(b) * 0.6 + Math.cos((x + y) * 0.0014) * 0.4;
+      const ang = v * Math.PI + 0.4;
+      return ang;
+    }
+    function updateFlow(dt) {
+      const t = dt / 1000;
+      flow.pts.forEach(p => {
+        const ang = flowField(p.x, p.y);
+        p.vx += Math.cos(ang) * 0.08;
+        p.vy += Math.sin(ang) * 0.08;
+        // bias to right
+        p.vx += 0.02;
+        // damping toward drift band
+        p.vx = p.vx * 0.95 + 1.2 * 0.05;
+        p.vy *= 0.95;
+        const sp = Math.hypot(p.vx, p.vy);
+        if (sp > 3.2) { p.vx *= 3.2 / sp; p.vy *= 3.2 / sp; }
+        p.x += p.vx * t * 60;
+        p.y += p.vy * t * 60;
+        if (p.x > W + 24 || p.y < -24 || p.y > H + 24) {
+          p.x = -20; p.y = rnd(0, H); p.vx = rnd(0.5, 1.6); p.vy = rnd(-0.4, 0.4);
+        }
+      });
+    }
+    function drawFlow() {
+      trailBg(0.1);
+      flow.pts.forEach(p => {
+        const sp = Math.hypot(p.vx, p.vy);
+        const alpha = 0.28 + Math.min(1, sp / 2.5) * 0.3;
+        ctx.fillStyle = 'rgba(26,26,26,' + alpha + ')';
+        ctx.beginPath(); ctx.arc(p.x, p.y, 1.3 + sp * 0.35, 0, Math.PI * 2); ctx.fill();
+      });
+    }
+
+    const STATES = {
+      orbit: { reset: resetOrbit, update: updateOrbit, draw: drawOrbit },
+      stigmergy: { reset: resetStig, update: updateStig, draw: drawStig },
+      mesh: { reset: resetMesh, update: updateMesh, draw: drawMesh },
+      sonar: { reset: resetSonar, update: updateSonar, draw: drawSonar },
+      letters: { reset: resetLetters, update: updateLetters, draw: drawLetters },
+      flow: { reset: resetFlow, update: updateFlow, draw: drawFlow },
+    };
+
+    function setMode(id) {
+      mode = id;
+      const isLetters = id === 'letters';
+      titleEl.classList.toggle('hidden', isLetters);
+      const s = STATES[id];
+      s.reset();
+      // clear fully
+      ctx.fillStyle = CREAM; ctx.fillRect(0, 0, W, H);
+      descEl.textContent = MODES.find(m => m.id === id).desc;
+      updateControls();
+    }
+    function updateControls() {
+      [...controlsEl.children].forEach(b => b.classList.toggle('active', b.dataset.id === mode));
+    }
+    MODES.forEach(m => {
+      const b = document.createElement('button');
+      b.className = 'pill'; b.textContent = m.name; b.dataset.id = m.id;
+      b.onclick = () => setMode(m.id);
+      controlsEl.appendChild(b);
+    });
+
+    // mouse
+    window.addEventListener('mousemove', e => {
+      mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true; mouse.lastMove = now;
+    });
+    window.addEventListener('mouseleave', () => { mouse.active = false; });
+    window.addEventListener('touchmove', e => {
+      if (e.touches[0]) { mouse.x = e.touches[0].clientX; mouse.y = e.touches[0].clientY; mouse.active = true; mouse.lastMove = now; }
+    }, { passive: true });
+
+    // keys
+    window.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        const i = MODES.findIndex(m => m.id === mode);
+        setMode(MODES[(i + 1) % MODES.length].id);
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        const i = MODES.findIndex(m => m.id === mode);
+        setMode(MODES[(i - 1 + MODES.length) % MODES.length].id);
+      }
+    });
+
+    window.addEventListener('resize', resize);
+
+    // boot
+    fontReady().then(() => {
+      resize();
+      setMode(MODES[0].id);
+      requestAnimationFrame(loop);
+    });
+    function loop(ts) {
+      now = ts;
+      const dt = last ? Math.min(ts - last, 50) : 16; last = ts;
+      const s = STATES[mode];
+      s.update(dt);
+      s.draw();
+      requestAnimationFrame(loop);
+    }
+  </script>
 </body>
 </html>
+"""
