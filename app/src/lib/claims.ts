@@ -28,6 +28,12 @@ export function siteUrl(): string {
   );
 }
 
+export function claimUrl(subdomain: string): string {
+  const base = new URL(siteUrl());
+  base.hostname = `${subdomain}.${base.hostname}`;
+  return base.toString().replace(/\/$/, '');
+}
+
 export function formatClaimedAt(iso: string): string {
   return new Intl.DateTimeFormat('en-US', {
     dateStyle: 'medium',

@@ -42,8 +42,19 @@ export type ValidationReason =
   | 'invalid_characters'
   | 'reserved';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function normalizeSubdomain(input: string): string {
   return input.trim().toLowerCase();
+}
+
+export function normalizeEmail(input: string): string {
+  return input.trim().toLowerCase();
+}
+
+export function validateEmail(input: string): boolean {
+  const email = normalizeEmail(input);
+  return email.length <= 254 && EMAIL_RE.test(email);
 }
 
 export function validateSubdomain(input: string): ValidationResult {
