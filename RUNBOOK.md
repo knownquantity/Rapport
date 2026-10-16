@@ -117,6 +117,10 @@ Update `ADMIN_TOKEN` in the environment (Vercel project settings / `.env.local`)
 
 A `pending` row from an abandoned checkout blocks the name for 24h, then becomes reclaimable and can be purged from `/admin`.
 
+## Known advisories
+
+- **`braces` stack-exhaustion DoS — `CVE-2026-93687` / `GHSA-vfj7-8cjw-p6xm`** (high, availability-only). Affects `braces <= 3.0.3`; **no patched version exists**. Present only via dev tooling: `eslint-config-next → @next/eslint-plugin-next → fast-glob → micromatch → braces`. `npm audit --omit=dev` reports **0 vulnerabilities** — it is not in the production bundle or runtime, and our brace patterns come from our own ESLint config (not network input), so it is not reachable. Accepted risk; re-check when upstream ships a fix. (`npm audit fix --force` only downgrades `eslint-config-next` and does not remove it.)
+
 ## Troubleshooting
 
 - **Subdomain 404s**: confirm `*.rapport.computer` resolves and `NEXT_PUBLIC_SITE_URL` hostname matches the root domain used by `proxy.ts`.
