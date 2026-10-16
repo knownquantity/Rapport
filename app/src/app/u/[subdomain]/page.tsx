@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { formatClaimedAt, getClaim, siteUrl } from '@/lib/claims';
+import { claimUrl, formatClaimedAt, getClaim, siteUrl } from '@/lib/claims';
 
 export async function generateMetadata(props: PageProps<'/u/[subdomain]'>) {
   const { subdomain } = await props.params;
@@ -11,9 +11,26 @@ export async function generateMetadata(props: PageProps<'/u/[subdomain]'>) {
     return { title: `${name} — not available` };
   }
 
+  const description = claim.bio ?? `${name} is claimed on rapport.computer.`;
+  const ogImage = `${siteUrl()}/api/og?name=${encodeURIComponent(subdomain)}${
+    claim.bio ? `&bio=${encodeURIComponent(claim.bio)}` : ''
+  }`;
+
   return {
     title: name,
-    description: claim.bio ?? `${name} is claimed on rapport.computer.`,
+    description,
+    openGraph: {
+      title: name,
+      description,
+      url: claimUrl(subdomain),
+      images: [{ url: ogImage, width: 1200, height: 630, alt: name }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: name,
+      description,
+      images: [ogImage],
+    },
   };
 }
 
